@@ -1,22 +1,19 @@
-# Chat App
+# 💬 ChatApp: Real-Time Chat
 
-A real-time chat application built with Django, Django Channels, and Daphne. Users can sign up, log in, and chat live over WebSockets.
+A real-time chat application built with **Django**, **Django Channels** and **Daphne**. Users sign up, log in, and chat live over WebSockets.
+
 ![Screenshot of the app](chatapp-image.png)
+
 ## Features
 
-- User signup, login, and logout (Django's built-in auth)
-- Real-time messaging with WebSockets
-- Protected chat page (login required)
-- Styled chat UI with message bubbles, timestamps, and connection status
-- One-click startup on Windows with `run.bat`
+- User sign-up and login (Django authentication)
+- Live messaging over WebSockets, with messages broadcast to everyone in the chat
+- ASGI server (Daphne) serving both HTTP pages and WebSocket connections
+- Load-test script included to measure concurrent-connection behavior
 
 ## Tech Stack
 
-- Python 3.10+
-- Django
-- Django Channels
-- Daphne (ASGI server)
-- SQLite (default database)
+Python · Django · Django Channels · Daphne (ASGI) · WebSockets · HTML/CSS
 
 ## Project Structure
 
@@ -26,152 +23,87 @@ chatapp/
 ├── run.bat
 ├── README.md
 ├── requirements.txt
+├── loadtest_chat.py          # WebSocket load-test script
 ├── chatapp/
 │   ├── settings.py
 │   ├── urls.py
 │   ├── asgi.py
 │   └── wsgi.py
 └── chat/
-    ├── consumers.py        # WebSocket consumer
-    ├── routing.py          # WebSocket URL routes
-    ├── urls.py             # HTTP URL routes
-    ├── views.py            # signup and chat views
+    ├── consumers.py          # WebSocket consumer
+    ├── routing.py            # WebSocket URL routes (ws/chat/)
+    ├── urls.py               # HTTP URL routes
+    ├── views.py              # Signup and chat views
     └── templates/
-        ├── chat/
-        │   └── chat.html
+        ├── chat/chat.html
         └── registration/
             ├── login.html
             └── signup.html
 ```
 
-## Setup
+## Getting Started
 
-### 1. Create and activate a virtual environment
+1. **Clone the repository**
 
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
+   ```bash
+   git clone https://github.com/hoomanv3xo/chatapp.git
+   cd chatapp
+   ```
 
-On macOS/Linux: `source venv/bin/activate`
+2. **Install dependencies**
 
-### 2. Install dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-pip install django channels daphne
-```
+3. **Create the database tables**
 
-Or, if `requirements.txt` exists:
+   ```bash
+   python manage.py migrate
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+4. **Start the server**
 
-To create or update it:
+   On Windows, double-click `run.bat`, or run Daphne directly:
 
-```bash
-pip freeze > requirements.txt
-```
+   ```bash
+   daphne -p 8000 chatapp.asgi:application
+   ```
 
-### 3. Apply migrations
+5. Open http://localhost:8000, create an account, log in, and open the chat page in a second browser or window to see messages arrive live.
 
-```bash
-python manage.py migrate
-```
+## Load Testing
 
-### 4. Run the server
+`loadtest_chat.py` opens many concurrent WebSocket clients that each send messages to the shared chat, then reports connections, delivery, and round-trip latency.
 
 ```bash
-python manage.py runserver
+pip install "websockets>=13"
+python loadtest_chat.py --url ws://localhost:8000/ws/chat/ --clients 50 --messages 5 --delay 10 \
+    --cookie "sessionid=<your logged-in session cookie>"
 ```
 
-Open http://127.0.0.1:8000/ in your browser.
+The chat requires login, so copy the `sessionid` cookie from your browser's developer tools after logging in.
 
-## Quick Start on Windows
+### Results
 
-Double-click **`run.bat`**. It activates the virtual environment, applies migrations, opens your browser, and starts the server.
+Tested locally on a single laptop, with the server and the test running on the same machine. All clients share one chat room and one login session. Each message is delivered to every connected client, so 50 clients sending 250 messages means 12,500 deliveries.
 
-## Usage
+| Clients | Messages sent | Delivered | Dropped connections | Median latency | p95 latency |
+|---|---|---|---|---|---|
+| 10 | 100 | 1,000 / 1,000 | 0 | 33 ms | 81 ms |
+| 50 | 250 | 12,500 / 12,500 | 0 | about 1,050 ms | about 2,300 ms |
 
-1. Go to http://127.0.0.1:8000/signup/ and create an account.
-2. You'll be taken to the chat page automatically.
-3. To test with multiple users, open a private/incognito window and sign up as a second user.
-4. Messages from each user appear instantly on both screens.
+**Takeaways**
 
-## Key Settings
-
-In `chatapp/settings.py`:
-
-```python
-INSTALLED_APPS = [
-    'daphne',          # must be first
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'channels',
-    'chat',
-]
-
-ASGI_APPLICATION = 'chatapp.asgi.application'
-
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    }
-}
-
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'chat'
-LOGOUT_REDIRECT_URL = 'login'
-```
-
-## Routes
-
-| URL            | Purpose                         |
-| -------------- | ------------------------------- |
-| `/`            | Chat page (login required)      |
-| `/login/`      | Login                           |
-| `/logout/`     | Logout (POST)                   |
-| `/signup/`     | Create an account               |
-| `/admin/`      | Django admin                    |
-| `ws/chat/`     | WebSocket endpoint              |
-
-## Optional: Admin Access
-
-```bash
-python manage.py createsuperuser
-```
-
-Then visit http://127.0.0.1:8000/admin/.
-
-## Troubleshooting
-
-| Problem | Fix |
-| --- | --- |
-| `No module named 'django'` | Activate the venv and use `python`, not `python3` |
-| `No module named 'daphne'` | Run `pip install daphne` |
-| `You have not set ASGI_APPLICATION` | Add `ASGI_APPLICATION = 'chatapp.asgi.application'` to `settings.py` |
-| `SyntaxError` in `settings.py` | Check for missing quotes or stray commas |
-| Messages don't appear | Check the browser console (F12) and the terminal for WebSocket errors |
-| Rocket page instead of the app | Make sure `chat` is in `INSTALLED_APPS` and `chat.urls` is included in `chatapp/urls.py` |
+- Every connection stayed up and every message was delivered in both runs.
+- Latency grows with the number of connected clients, because each message is delivered to each of them. Under a heavy send rate (50 clients sending several times a second), the server fell behind and messages arrived seconds late.
+- Next improvement: profile the consumer and the channel layer configuration to reduce per-message latency at higher client counts.
 
 ## Limitations
 
-- Messages are not saved. They disappear on page refresh.
-- The in-memory channel layer works only with a single process. Use Redis (`channels_redis`) for production.
-- `DEBUG = True` and the default `SECRET_KEY` are for development only.
+- A single shared chat room (no private rooms or direct messages)
+- Load figures are from local testing, not a production deployment
 
-## Roadmap
+## Disclaimer
 
-- [ ] Save messages to the database and load history
-- [ ] Multiple chat rooms
-- [ ] Redis channel layer for deployment
-- [ ] Online users list and typing indicator
-
-## License
-
-Free to use and modify for learning and personal projects.
-
+Built as a learning project. Not intended for production use without further hardening.
