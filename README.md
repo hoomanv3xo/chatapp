@@ -1,7 +1,7 @@
 # Chat App
 
 A real-time chat application built with Django, Django Channels, and Daphne. Users can sign up, log in, and chat live over WebSockets.
-
+![Screenshot of the app](chatapp-image.png)
 ## Features
 
 - User signup, login, and logout (Django's built-in auth)
